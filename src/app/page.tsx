@@ -12,7 +12,7 @@ import { ModeToggle } from '@/components/mode-toggle'
 import { SiteInfo } from './api/check-site/route'
 
 const PRESET_SITES = [
-  { name: 'AcoFork Blog', url: 'https://blog.acofork.com' },
+  { name: '速核云寄售', url: 'https://vkyun.cn' },
   { name: 'Cloudflare', url: 'https://www.cloudflare.com' },
   { name: 'Google', url: 'https://www.google.com' },
   { name: 'Bing', url: 'https://www.bing.com' },
