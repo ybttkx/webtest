@@ -31,8 +31,15 @@ export interface SiteInfo {
   supportsHttp2: boolean
   supportsHttp3: boolean
   supportsHsts: boolean
+  hstsDetail?: {
+    maxAge: number
+    includeSubDomains: boolean
+    preload: boolean
+  }
   headers?: Record<string, string>
+  server?: string
   statusCode?: number
+  redirectLocation?: string
   timings?: {
     dns: number
     tcp: number
@@ -228,6 +235,15 @@ export async function POST(request: Request) {
                 
                 const hsts = headers['strict-transport-security']
                 const supportsHsts = !!hsts
+                
+                let hstsDetail = undefined
+                if (hsts) {
+                    const maxAgeMatch = hsts.match(/max-age=(\d+)/i)
+                    const maxAge = maxAgeMatch ? parseInt(maxAgeMatch[1], 10) : 0
+                    const includeSubDomains = hsts.toLowerCase().includes('includesubdomains')
+                    const preload = hsts.toLowerCase().includes('preload')
+                    hstsDetail = { maxAge, includeSubDomains, preload }
+                }
 
                 // Calculate timings
                 if (t1 === 0) t1 = t0
@@ -304,7 +320,10 @@ export async function POST(request: Request) {
                         supportsHttp3,
                         supportsHttp1_1,
                         supportsHsts,
+                        hstsDetail,
                         statusCode: res.statusCode,
+                        server: headers['server'],
+                        redirectLocation: headers['location'],
                         timings,
                         title,
                         description,

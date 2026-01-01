@@ -7,9 +7,25 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Badge } from '@/components/ui/badge'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
-import { Loader2, Globe, Shield, Server, AlertCircle, CheckCircle, XCircle, Timer, Info, Github, User } from 'lucide-react'
+import { Loader2, Globe, Shield, Server, AlertCircle, CheckCircle, XCircle, Timer, Info, Github, User, ArrowRight, History, Trash2 } from 'lucide-react'
 import { ModeToggle } from '@/components/mode-toggle'
 import { SiteInfo } from './api/check-site/route'
+
+const PRESET_SITES = [
+  { name: 'AcoFork Blog', url: 'https://blog.acofork.com' },
+  { name: 'Cloudflare', url: 'https://www.cloudflare.com' },
+  { name: 'Google', url: 'https://www.google.com' },
+  { name: 'Bing', url: 'https://www.bing.com' },
+  { name: 'Baidu', url: 'https://www.baidu.com' },
+  { name: 'Github', url: 'https://github.com' },
+  { name: 'Pixiv', url: 'https://www.pixiv.net' },
+]
+
+const formatDuration = (seconds: number) => {
+  const days = Math.floor(seconds / (3600 * 24))
+  if (days > 365) return `${(days / 365).toFixed(1)} 年`
+  return `${days} 天`
+}
 
 interface ProbeInfo {
   query: string
@@ -26,6 +42,29 @@ export default function Home() {
   const [result, setResult] = useState<SiteInfo | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [probeInfo, setProbeInfo] = useState<ProbeInfo | null>(null)
+  const [history, setHistory] = useState<string[]>([])
+
+  useEffect(() => {
+    const saved = localStorage.getItem('site_check_history')
+    if (saved) {
+      try {
+        setHistory(JSON.parse(saved))
+      } catch (e) {}
+    }
+  }, [])
+
+  const addToHistory = (url: string) => {
+    setHistory(prev => {
+      const newHistory = [url, ...prev.filter(u => u !== url)].slice(0, 10)
+      localStorage.setItem('site_check_history', JSON.stringify(newHistory))
+      return newHistory
+    })
+  }
+
+  const clearHistory = () => {
+    setHistory([])
+    localStorage.removeItem('site_check_history')
+  }
 
   useEffect(() => {
     fetch('/api/probe-info')
@@ -38,13 +77,13 @@ export default function Home() {
       .catch(console.error)
   }, [])
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-    if (!url) return
+  const checkUrl = async (targetUrl: string) => {
+    if (!targetUrl) return
 
     setLoading(true)
     setError(null)
     setResult(null)
+    setUrl(targetUrl)
 
     try {
       const response = await fetch('/api/check-site', {
@@ -52,7 +91,7 @@ export default function Home() {
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ url }),
+        body: JSON.stringify({ url: targetUrl }),
       })
 
       if (!response.ok) {
@@ -64,12 +103,18 @@ export default function Home() {
         setError(data.error)
       } else {
         setResult(data)
+        addToHistory(targetUrl)
       }
     } catch (err: any) {
       setError(`发生意外错误: ${err.message || String(err)}`)
     } finally {
       setLoading(false)
     }
+  }
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    checkUrl(url)
   }
 
   return (
@@ -122,6 +167,55 @@ export default function Home() {
                 )}
               </Button>
             </form>
+
+            <div className="mt-6 space-y-4">
+              <div>
+                <p className="text-sm font-medium text-muted-foreground mb-2">常用检测</p>
+                <div className="flex flex-wrap gap-2">
+                  {PRESET_SITES.map((site) => (
+                    <Badge 
+                      key={site.name} 
+                      variant="secondary" 
+                      className="cursor-pointer hover:bg-secondary/80 transition-colors"
+                      onClick={() => checkUrl(site.url)}
+                    >
+                      {site.name}
+                    </Badge>
+                  ))}
+                </div>
+              </div>
+
+              {history.length > 0 && (
+                <div>
+                  <div className="flex items-center justify-between mb-2">
+                    <p className="text-sm font-medium text-muted-foreground flex items-center">
+                      <History className="w-3 h-3 mr-1" /> 历史记录
+                    </p>
+                    <Button 
+                      variant="ghost" 
+                      size="sm" 
+                      className="h-6 px-2 text-xs text-muted-foreground hover:text-destructive"
+                      onClick={clearHistory}
+                    >
+                      <Trash2 className="w-3 h-3 mr-1" /> 清空
+                    </Button>
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    {history.map((hUrl) => (
+                      <Badge 
+                        key={hUrl} 
+                        variant="outline" 
+                        className="cursor-pointer hover:bg-muted transition-colors font-normal max-w-[200px] truncate"
+                        onClick={() => checkUrl(hUrl)}
+                        title={hUrl}
+                      >
+                        {hUrl.replace(/^https?:\/\//, '').replace(/\/$/, '')}
+                      </Badge>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
           </CardContent>
         </Card>
 
@@ -149,6 +243,26 @@ export default function Home() {
                         {result.statusCode || '未知'}
                     </Badge>
                   </div>
+                  {result.redirectLocation && (
+                    <div className="flex flex-col space-y-2 p-2 bg-muted/50 rounded-md border border-muted">
+                        <div className="flex items-center justify-between">
+                            <span className="text-xs font-medium text-muted-foreground flex items-center">
+                              <Info className="w-3 h-3 mr-1"/> 重定向到
+                            </span>
+                            <Button 
+                                variant="ghost" 
+                                size="sm" 
+                                className="h-6 px-2 text-xs hover:bg-background border border-transparent hover:border-border"
+                                onClick={() => checkUrl(result.redirectLocation!)}
+                            >
+                                检测此地址 <ArrowRight className="ml-1 w-3 h-3" />
+                            </Button>
+                        </div>
+                        <span className="text-xs font-mono break-all text-blue-600 dark:text-blue-400">
+                          {result.redirectLocation}
+                        </span>
+                    </div>
+                  )}
                   <div className="flex items-center justify-between">
                     <span className="text-sm font-medium">HTTP/1.1</span>
                     {result.supportsHttp1_1 ? (
@@ -173,12 +287,30 @@ export default function Home() {
                       <Badge variant="outline">未检测到</Badge>
                     )}
                   </div>
-                   <div className="flex items-center justify-between">
-                    <span className="text-sm font-medium">HSTS 支持</span>
-                    {result.supportsHsts ? (
-                      <Badge className="bg-green-600"><CheckCircle className="w-3 h-3 mr-1"/> 是</Badge>
-                    ) : (
-                      <Badge variant="outline"><XCircle className="w-3 h-3 mr-1"/> 否</Badge>
+                  <div className="flex flex-col space-y-1">
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm font-medium">HSTS 支持</span>
+                      {result.supportsHsts ? (
+                        <Badge className="bg-green-600"><CheckCircle className="w-3 h-3 mr-1"/> 是</Badge>
+                      ) : (
+                        <Badge variant="outline"><XCircle className="w-3 h-3 mr-1"/> 否</Badge>
+                      )}
+                    </div>
+                    {result.supportsHsts && result.hstsDetail && (
+                      <div className="pl-2 border-l-2 border-green-600/20 space-y-1 mt-1 pt-1">
+                          <div className="flex justify-between text-xs">
+                              <span className="text-muted-foreground">最大有效期</span>
+                              <span className="font-mono">{result.hstsDetail.maxAge} 秒 ({formatDuration(result.hstsDetail.maxAge)})</span>
+                          </div>
+                          <div className="flex justify-between text-xs">
+                              <span className="text-muted-foreground">包含子域名</span>
+                              <span className="font-mono">{result.hstsDetail.includeSubDomains ? '是' : '否'}</span>
+                          </div>
+                          <div className="flex justify-between text-xs">
+                              <span className="text-muted-foreground">预加载 (Preload)</span>
+                              <span className="font-mono">{result.hstsDetail.preload ? '是' : '否'}</span>
+                          </div>
+                      </div>
                     )}
                   </div>
                   <div className="flex items-center justify-between">
@@ -326,6 +458,12 @@ export default function Home() {
                             <div className="flex items-center justify-between mt-1">
                                 <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">CNAME</span>
                                 <span className="text-sm font-mono truncate max-w-[180px]" title={result.cname}>{result.cname}</span>
+                            </div>
+                        )}
+                        {result.server && (
+                            <div className="flex items-center justify-between mt-1">
+                                <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Web 服务器</span>
+                                <span className="text-sm font-mono truncate max-w-[180px]" title={result.server}>{result.server}</span>
                             </div>
                         )}
                         {result.ipInfo.country && (
