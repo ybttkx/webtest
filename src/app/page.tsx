@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -11,11 +11,32 @@ import { Loader2, Globe, Shield, Server, AlertCircle, CheckCircle, XCircle, Time
 import { ModeToggle } from '@/components/mode-toggle'
 import { SiteInfo } from './api/check-site/route'
 
+interface ProbeInfo {
+  query: string
+  country: string
+  countryCode: string
+  regionName: string
+  city: string
+  isp: string
+}
+
 export default function Home() {
   const [url, setUrl] = useState('')
   const [loading, setLoading] = useState(false)
   const [result, setResult] = useState<SiteInfo | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [probeInfo, setProbeInfo] = useState<ProbeInfo | null>(null)
+
+  useEffect(() => {
+    fetch('/api/probe-info')
+      .then(res => res.json())
+      .then(data => {
+        if (data.status === 'success') {
+          setProbeInfo(data)
+        }
+      })
+      .catch(console.error)
+  }, [])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -64,6 +85,17 @@ export default function Home() {
           <p className="mt-4 text-lg text-gray-600 dark:text-gray-400">
             即时分析 HTTP 版本、TLS 支持和证书详情。
           </p>
+          
+          <div className="mt-2 flex items-center justify-center gap-2 text-sm text-gray-500 dark:text-gray-400">
+            <Globe className="h-4 w-4" />
+            {probeInfo ? (
+              <span>
+                探测节点: {probeInfo.query} ({probeInfo.countryCode} {probeInfo.city}) - {probeInfo.isp}
+              </span>
+            ) : (
+              <span className="animate-pulse">正在获取探测节点信息...</span>
+            )}
+          </div>
         </div>
 
         <Card className="w-full shadow-lg">
